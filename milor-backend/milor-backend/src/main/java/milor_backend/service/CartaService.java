@@ -24,17 +24,18 @@ public class CartaService {
 
     @Transactional
     public CartaDiariaDTO obtenerCartaActual() {
-        List<Plato> platos = platoRepository.findByActivoTrue();
-        List<Entrada> entradas = entradaRepository.findByActivoTrue();
+        List<Plato> platos = platoRepository.findAll();
+        List<Entrada> entradas = entradaRepository.findAll();
 
         ConfiguracionPrecio precio = configuracionPrecioRepository.findAll().stream()
                 .findFirst()
-                .orElseGet(() -> configuracionPrecioRepository.save(
-                        ConfiguracionPrecio.builder()
-                                .menuCompleto(new BigDecimal("12.00"))
-                                .soloSegundo(new BigDecimal("10.00"))
-                                .build()
-                ));
+                .orElseGet(() -> {
+                    ConfiguracionPrecio nuevo = ConfiguracionPrecio.builder()
+                            .menuCompleto(new BigDecimal("12.00"))
+                            .soloSegundo(new BigDecimal("10.00"))
+                            .build();
+                    return configuracionPrecioRepository.save(nuevo);
+                });
 
         return CartaDiariaDTO.builder()
                 .platos(platos)
@@ -45,6 +46,9 @@ public class CartaService {
 
     @Transactional
     public Plato guardarPlato(Plato plato) {
+        if (plato.getActivo() == null) {
+            plato.setActivo(true);
+        }
         return platoRepository.save(plato);
     }
 
@@ -55,6 +59,9 @@ public class CartaService {
 
     @Transactional
     public Entrada guardarEntrada(Entrada entrada) {
+        if (entrada.getActivo() == null) {
+            entrada.setActivo(true);
+        }
         return entradaRepository.save(entrada);
     }
 

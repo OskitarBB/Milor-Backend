@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/carta")
 @RequiredArgsConstructor
+@CrossOrigin(origins = {"http://localhost:4200", "http://127.0.0.1:4200"}, allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class CartaController {
 
     private final CartaService cartaService;
@@ -59,7 +60,6 @@ public class CartaController {
     }
 
     private void notificarActualizacionCarta() {
-        // Emite la carta actualizada al topic /topic/carta para refrescar el frontend
         messagingTemplate.convertAndSend("/topic/carta", cartaService.obtenerCartaActual());
     }
 }
