@@ -9,6 +9,7 @@ import milor_backend.repository.ConfiguracionPrecioRepository;
 import milor_backend.repository.DetalleVentaRepository;
 import milor_backend.repository.EntradaRepository;
 import milor_backend.repository.PlatoRepository;
+import milor_backend.repository.TurnoRepository;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,10 @@ public class CartaService {
     private final EntradaRepository entradaRepository;
     private final ConfiguracionPrecioRepository configuracionPrecioRepository;
     private final DetalleVentaRepository detalleVentaRepository;
+    private final TurnoRepository turnoRepository;
     private final VentaService ventaService;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
-    // CORRECCIÓN: Quitamos (readOnly = true) porque este método puede hacer un .save() por defecto
     @Transactional
     public CartaDiariaDTO obtenerCartaActual() {
         List<Plato> platos = platoRepository.findAll();
@@ -52,6 +53,7 @@ public class CartaService {
 
     @Transactional
     public Plato guardarPlato(Plato plato) {
+        validarTurnoAbierto();
         if (plato.getActivo() == null) {
             plato.setActivo(true);
         }
@@ -61,6 +63,7 @@ public class CartaService {
 
     @Transactional
     public void eliminarPlato(Long id) {
+        validarTurnoAbierto();
         boolean tieneVentas = detalleVentaRepository.existsByPlatoId(id);
 
         if (tieneVentas) {
@@ -77,6 +80,7 @@ public class CartaService {
 
     @Transactional
     public Entrada guardarEntrada(Entrada entrada) {
+        validarTurnoAbierto();
         if (entrada.getActivo() == null) {
             entrada.setActivo(true);
         }
@@ -86,6 +90,7 @@ public class CartaService {
 
     @Transactional
     public void eliminarEntrada(Long id) {
+        validarTurnoAbierto();
         boolean tieneVentas = detalleVentaRepository.existsByEntradaId(id);
 
         if (tieneVentas) {
@@ -101,17 +106,24 @@ public class CartaService {
 
     @Transactional
     public ConfiguracionPrecio actualizarPrecios(ConfiguracionPrecio nuevosPrecios) {
+        validarTurnoAbierto();
         notificarCambiosMetricas();
         return configuracionPrecioRepository.save(nuevosPrecios);
     }
 
-    // Escucha el evento de venta para actualizar la carta en tiempo real vía WebSocket sin ciclos
+    private void validarTurnoAbierto() {
+        boolean hayTurno = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO").isPresent();
+        if (!hayTurno) {
+            throw new RuntimeException("Acción bloqueada: No se puede modificar la carta sin un turno abierto.");
+        }
+    }
+
     @EventListener
     public void handleVentaRegistrada(VentaRegistradaEvent event) {
         try {
             messagingTemplate.convertAndSend("/topic/carta", obtenerCartaActual());
         } catch (Exception e) {
-            System.err.println("Error al actualizar carta por WebSocket tras venta: " + e.getMessage());
+            System.err.println("Error al actualizar carta por WebSocket: " + e.getMessage());
         }
     }
 

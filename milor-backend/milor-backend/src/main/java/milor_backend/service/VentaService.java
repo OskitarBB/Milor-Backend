@@ -34,7 +34,7 @@ public class VentaService {
     @Transactional
     public VentaRegistro registrarVenta(RegistroVentaRequest request) {
         Turno turnoActual = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO")
-                .orElseThrow(() -> new RuntimeException("No hay turno abierto para registrar la venta."));
+                .orElseThrow(() -> new RuntimeException("Acción bloqueada: No hay un turno abierto para registrar ventas."));
 
         BigDecimal total = BigDecimal.ZERO;
 
