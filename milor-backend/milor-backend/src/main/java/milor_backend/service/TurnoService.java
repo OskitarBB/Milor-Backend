@@ -1,70 +1,48 @@
 package milor_backend.service;
 
 import lombok.RequiredArgsConstructor;
-import milor_backend.entity.Plato;
 import milor_backend.entity.Turno;
-import milor_backend.repository.PlatoRepository;
 import milor_backend.repository.TurnoRepository;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class TurnoService {
 
     private final TurnoRepository turnoRepository;
-    private final PlatoRepository platoRepository;
-    private final CartaService cartaService;
-    private final VentaService ventaService;
-    private final SimpMessagingTemplate messagingTemplate;
 
+    // 1. Método para abrir un nuevo turno
     @Transactional
-    public void cerrarTurnoActual() {
-        // 1. Cerrar el turno activo
-        Turno turnoActual = turnoRepository.findByEstado("ABIERTO")
-                .orElseThrow(() -> new RuntimeException("No hay turno abierto. Por favor, crea uno en la base de datos."));
-
-        turnoActual.setFechaCierre(LocalDateTime.now());
-        turnoActual.setEstado("CERRADO");
-        turnoRepository.save(turnoActual);
-
-        // 2. Inactivar todo el menú del día actual (borrado lógico)
-        List<Plato> platos = platoRepository.findAll();
-        platos.forEach(p -> p.setActivo(false));
-        platoRepository.saveAll(platos);
-
-        // 3. Abrir un nuevo turno en blanco automáticamente
+    public Turno abrirNuevoTurno() {
         Turno nuevoTurno = Turno.builder()
-                .fechaApertura(LocalDateTime.now())
                 .estado("ABIERTO")
+                .fechaApertura(LocalDateTime.now())
                 .build();
-        turnoRepository.save(nuevoTurno);
-
-        // 4. Refrescar el frontend al instante mediante WebSocket
-        try {
-            messagingTemplate.convertAndSend("/topic/carta", cartaService.obtenerCartaActual());
-            messagingTemplate.convertAndSend("/topic/metricas", ventaService.obtenerMetricas());
-        } catch (Exception e) {
-            System.err.println("Error al emitir métricas por WebSocket en cierre de turno: " + e.getMessage());
-        }
+        return turnoRepository.save(nuevoTurno);
     }
 
-    @Transactional
-    public void inicializarPrimerTurno() {
-        // Verificamos si ya existe un turno abierto para no duplicar
-        boolean existeAbierto = turnoRepository.findByEstado("ABIERTO").isPresent();
+    // 2. Método para obtener el turno abierto actual de forma segura
+    @Transactional(readOnly = true)
+    public Optional<Turno> obtenerTurnoAbierto() {
+        return turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO");
+    }
 
-        if (!existeAbierto) {
-            Turno nuevoTurno = Turno.builder()
-                    .fechaApertura(LocalDateTime.now())
-                    .estado("ABIERTO")
-                    .build();
-            turnoRepository.save(nuevoTurno);
-            System.out.println("Primer turno inicializado con éxito.");
+    // 3. Tu método existente para cerrar turno (mantenlo tal cual lo tengas)
+    @Transactional
+    public void cerrarTurnoActual() {
+        Optional<Turno> turnoOpt = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO");
+        if (turnoOpt.isPresent()) {
+            Turno turno = turnoOpt.get();
+            turno.setEstado("CERRADO");
+            turno.setFechaCierre(LocalDateTime.now());
+            turnoRepository.save(turno);
         }
+
+        // Opcional: abre uno nuevo automáticamente al cerrar, o déjalo vacío según prefieras.
+        // abrirNuevoTurno();
     }
 }

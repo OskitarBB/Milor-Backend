@@ -9,6 +9,7 @@ import milor_backend.repository.ConfiguracionPrecioRepository;
 import milor_backend.repository.DetalleVentaRepository;
 import milor_backend.repository.EntradaRepository;
 import milor_backend.repository.PlatoRepository;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +27,8 @@ public class CartaService {
     private final VentaService ventaService;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
-    @Transactional(readOnly = true)
+    // CORRECCIÓN: Quitamos (readOnly = true) porque este método puede hacer un .save() por defecto
+    @Transactional
     public CartaDiariaDTO obtenerCartaActual() {
         List<Plato> platos = platoRepository.findAll();
         List<Entrada> entradas = entradaRepository.findAll();
@@ -59,18 +61,15 @@ public class CartaService {
 
     @Transactional
     public void eliminarPlato(Long id) {
-        // Verificamos si el plato tiene historial de ventas en detalles_venta
         boolean tieneVentas = detalleVentaRepository.existsByPlatoId(id);
 
         if (tieneVentas) {
-            // Borrado lógico para proteger las ventas históricas
             Plato plato = platoRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Plato no encontrado"));
             plato.setActivo(false);
             plato.setStock(0);
             platoRepository.save(plato);
         } else {
-            // Borrado físico si nunca fue vendido
             platoRepository.deleteById(id);
         }
         notificarCambiosMetricas();
@@ -87,17 +86,14 @@ public class CartaService {
 
     @Transactional
     public void eliminarEntrada(Long id) {
-        // Verificamos si la entrada tiene historial de ventas en detalles_venta
         boolean tieneVentas = detalleVentaRepository.existsByEntradaId(id);
 
         if (tieneVentas) {
-            // Borrado lógico para proteger las ventas históricas
             Entrada entrada = entradaRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Entrada no encontrada"));
             entrada.setActivo(false);
             entradaRepository.save(entrada);
         } else {
-            // Borrado físico si nunca fue vendida
             entradaRepository.deleteById(id);
         }
         notificarCambiosMetricas();
@@ -107,6 +103,16 @@ public class CartaService {
     public ConfiguracionPrecio actualizarPrecios(ConfiguracionPrecio nuevosPrecios) {
         notificarCambiosMetricas();
         return configuracionPrecioRepository.save(nuevosPrecios);
+    }
+
+    // Escucha el evento de venta para actualizar la carta en tiempo real vía WebSocket sin ciclos
+    @EventListener
+    public void handleVentaRegistrada(VentaRegistradaEvent event) {
+        try {
+            messagingTemplate.convertAndSend("/topic/carta", obtenerCartaActual());
+        } catch (Exception e) {
+            System.err.println("Error al actualizar carta por WebSocket tras venta: " + e.getMessage());
+        }
     }
 
     private void notificarCambiosMetricas() {

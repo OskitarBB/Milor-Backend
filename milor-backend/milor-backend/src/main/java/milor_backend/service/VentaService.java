@@ -33,7 +33,7 @@ public class VentaService {
 
     @Transactional
     public VentaRegistro registrarVenta(RegistroVentaRequest request) {
-        Turno turnoActual = turnoRepository.findByEstado("ABIERTO")
+        Turno turnoActual = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO")
                 .orElseThrow(() -> new RuntimeException("No hay turno abierto para registrar la venta."));
 
         BigDecimal total = BigDecimal.ZERO;
@@ -98,9 +98,7 @@ public class VentaService {
 
     @Transactional(readOnly = true)
     public DashboardMetricasDTO obtenerMetricas() {
-        Optional<Turno> turnoActivoOpt = turnoRepository.findByEstado("ABIERTO");
-
-        if (turnoActivoOpt.isEmpty()) {
+        Optional<Turno> turnoActivoOpt = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO");        if (turnoActivoOpt.isEmpty()) {
             return DashboardMetricasDTO.builder()
                     .totalRecaudado(BigDecimal.ZERO)
                     .totalMenusVendidos(0)
