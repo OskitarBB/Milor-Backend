@@ -4,14 +4,8 @@ import lombok.RequiredArgsConstructor;
 import milor_backend.dto.DashboardMetricasDTO;
 import milor_backend.dto.ItemVentaRequest;
 import milor_backend.dto.RegistroVentaRequest;
-import milor_backend.entity.DetalleVenta;
-import milor_backend.entity.Entrada;
-import milor_backend.entity.Plato;
-import milor_backend.entity.VentaRegistro;
-import milor_backend.repository.DetalleVentaRepository;
-import milor_backend.repository.EntradaRepository;
-import milor_backend.repository.PlatoRepository;
-import milor_backend.repository.VentaRegistroRepository;
+import milor_backend.entity.*;
+import milor_backend.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,15 +26,20 @@ public class VentaService {
     private final DetalleVentaRepository detalleVentaRepository;
     private final PlatoRepository platoRepository;
     private final EntradaRepository entradaRepository;
+    private final TurnoRepository turnoRepository;
 
     @Transactional
     public VentaRegistro registrarVenta(RegistroVentaRequest request) {
+        Turno turnoActual = turnoRepository.findByEstado("ABIERTO")
+                .orElseThrow(() -> new RuntimeException("No hay turno abierto para registrar la venta."));
+
         BigDecimal total = BigDecimal.ZERO;
 
         VentaRegistro venta = VentaRegistro.builder()
                 .modalidad(request.getModalidad())
                 .fechaHora(LocalDateTime.now())
                 .total(BigDecimal.ZERO)
+                .turno(turnoActual)
                 .build();
 
         VentaRegistro ventaGuardada = ventaRegistroRepository.save(venta);
@@ -79,10 +79,42 @@ public class VentaService {
 
     @Transactional(readOnly = true)
     public DashboardMetricasDTO obtenerMetricas() {
-        List<VentaRegistro> ventas = ventaRegistroRepository.findAll();
-        List<DetalleVenta> detalles = detalleVentaRepository.findAll();
+        Optional<Turno> turnoActivoOpt = turnoRepository.findByEstado("ABIERTO");
+
+        if (turnoActivoOpt.isEmpty()) {
+            return DashboardMetricasDTO.builder()
+                    .totalRecaudado(BigDecimal.ZERO)
+                    .totalMenusVendidos(0)
+                    .totalLocal(0)
+                    .totalLlevar(0)
+                    .totalConEntrada(0)
+                    .totalSinEntrada(0)
+                    .conteoPorPlato(new HashMap<>())
+                    .ultimasVentas(new ArrayList<>())
+                    .build();
+        }
+
+        Turno turnoActual = turnoActivoOpt.get();
+
+        List<VentaRegistro> ventas = ventaRegistroRepository.findByTurno(turnoActual);
+        List<DetalleVenta> detalles = detalleVentaRepository.findByVentaTurno(turnoActual);
         List<Plato> platos = platoRepository.findAll();
 
+        return construirMetricas(ventas, detalles, platos);
+    }
+
+    // Nuevo servicio que filtra exclusivamente por las fechas recibidas
+    @Transactional(readOnly = true)
+    public DashboardMetricasDTO obtenerMetricasHistorico(LocalDateTime inicio, LocalDateTime fin) {
+        List<VentaRegistro> ventas = ventaRegistroRepository.findByFechaHoraBetweenOrderByFechaHoraDesc(inicio, fin);
+        List<DetalleVenta> detalles = detalleVentaRepository.findByVenta_FechaHoraBetween(inicio, fin);
+        List<Plato> platos = platoRepository.findAll();
+
+        return construirMetricas(ventas, detalles, platos);
+    }
+
+    // Lógica matemática centralizada
+    private DashboardMetricasDTO construirMetricas(List<VentaRegistro> ventas, List<DetalleVenta> detalles, List<Plato> platos) {
         BigDecimal totalRecaudado = ventas.stream()
                 .map(VentaRegistro::getTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -112,20 +144,19 @@ public class VentaService {
                     .filter(d -> d.getPlato() != null && d.getPlato().getId().equals(plato.getId()))
                     .count();
 
-            String stockStr = Boolean.TRUE.equals(plato.getEsIlimitado()) ? "Ilimitado" : String.valueOf(plato.getStock());
+            if (vendidos > 0 || (plato.getActivo() != null && plato.getActivo())) {
+                String stockStr = Boolean.TRUE.equals(plato.getEsIlimitado()) ? "Ilimitado" : String.valueOf(plato.getStock());
+                boolean esActivo = plato.getActivo() == null || plato.getActivo();
 
-            // ¡ESTA ES LA LÍNEA QUE FALTABA DECLARAR PARA EVITAR EL ERROR EN JAVA!
-            boolean esActivo = plato.getActivo() == null || plato.getActivo();
-
-            conteoPorPlato.put(plato.getId(), DashboardMetricasDTO.DetallePlatoMetrica.builder()
-                    .nombre(plato.getNombre())
-                    .vendidos(vendidos)
-                    .stockRestante(stockStr)
-                    .activo(esActivo) // Ahora sí reconocerá la variable
-                    .build());
+                conteoPorPlato.put(plato.getId(), DashboardMetricasDTO.DetallePlatoMetrica.builder()
+                        .nombre(plato.getNombre())
+                        .vendidos(vendidos)
+                        .stockRestante(stockStr)
+                        .activo(esActivo)
+                        .build());
+            }
         }
 
-        // Mapeo ordenado de las últimas 10 ventas
         Map<Long, List<DetalleVenta>> detallesPorVenta = detalles.stream()
                 .filter(d -> d.getVenta() != null)
                 .collect(Collectors.groupingBy(d -> d.getVenta().getId()));

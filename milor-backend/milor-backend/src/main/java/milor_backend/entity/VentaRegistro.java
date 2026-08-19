@@ -30,6 +30,11 @@ public class VentaRegistro {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
+    // NUEVA RELACIÓN: Cada venta pertenece a un turno
+    @ManyToOne
+    @JoinColumn(name = "turno_id")
+    private Turno turno;
+
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<DetalleVenta> items = new ArrayList<>();
