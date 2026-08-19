@@ -6,6 +6,7 @@ import milor_backend.entity.ConfiguracionPrecio;
 import milor_backend.entity.Entrada;
 import milor_backend.entity.Plato;
 import milor_backend.repository.ConfiguracionPrecioRepository;
+import milor_backend.repository.DetalleVentaRepository;
 import milor_backend.repository.EntradaRepository;
 import milor_backend.repository.PlatoRepository;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,9 @@ public class CartaService {
     private final PlatoRepository platoRepository;
     private final EntradaRepository entradaRepository;
     private final ConfiguracionPrecioRepository configuracionPrecioRepository;
+    private final DetalleVentaRepository detalleVentaRepository;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public CartaDiariaDTO obtenerCartaActual() {
         List<Plato> platos = platoRepository.findAll();
         List<Entrada> entradas = entradaRepository.findAll();
@@ -54,7 +56,20 @@ public class CartaService {
 
     @Transactional
     public void eliminarPlato(Long id) {
-        platoRepository.deleteById(id);
+        // Verificamos si el plato tiene historial de ventas en detalles_venta
+        boolean tieneVentas = detalleVentaRepository.existsByPlatoId(id);
+
+        if (tieneVentas) {
+            // Borrado lógico para proteger las ventas históricas
+            Plato plato = platoRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Plato no encontrado"));
+            plato.setActivo(false);
+            plato.setStock(0);
+            platoRepository.save(plato);
+        } else {
+            // Borrado físico si nunca fue vendido
+            platoRepository.deleteById(id);
+        }
     }
 
     @Transactional
@@ -67,7 +82,19 @@ public class CartaService {
 
     @Transactional
     public void eliminarEntrada(Long id) {
-        entradaRepository.deleteById(id);
+        // Verificamos si la entrada tiene historial de ventas en detalles_venta
+        boolean tieneVentas = detalleVentaRepository.existsByEntradaId(id);
+
+        if (tieneVentas) {
+            // Borrado lógico para proteger las ventas históricas
+            Entrada entrada = entradaRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Entrada no encontrada"));
+            entrada.setActivo(false);
+            entradaRepository.save(entrada);
+        } else {
+            // Borrado físico si nunca fue vendida
+            entradaRepository.deleteById(id);
+        }
     }
 
     @Transactional

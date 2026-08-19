@@ -6,4 +6,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DetalleVentaRepository extends JpaRepository<DetalleVenta, Long> {
+    boolean existsByPlatoId(Long platoId);
+    boolean existsByEntradaId(Long entradaId);
 }

@@ -32,10 +32,11 @@ public class CartaController {
     }
 
     @DeleteMapping("/platos/{id}")
-    public ResponseEntity<Void> eliminarPlato(@PathVariable Long id) {
+    public ResponseEntity<CartaDiariaDTO> eliminarPlato(@PathVariable Long id) {
         cartaService.eliminarPlato(id);
-        notificarActualizacionCarta();
-        return ResponseEntity.noContent().build();
+        CartaDiariaDTO cartaActualizada = cartaService.obtenerCartaActual();
+        messagingTemplate.convertAndSend("/topic/carta", cartaActualizada);
+        return ResponseEntity.ok(cartaActualizada);
     }
 
     @PostMapping("/entradas")
@@ -46,10 +47,11 @@ public class CartaController {
     }
 
     @DeleteMapping("/entradas/{id}")
-    public ResponseEntity<Void> eliminarEntrada(@PathVariable Long id) {
+    public ResponseEntity<CartaDiariaDTO> eliminarEntrada(@PathVariable Long id) {
         cartaService.eliminarEntrada(id);
-        notificarActualizacionCarta();
-        return ResponseEntity.noContent().build();
+        CartaDiariaDTO cartaActualizada = cartaService.obtenerCartaActual();
+        messagingTemplate.convertAndSend("/topic/carta", cartaActualizada);
+        return ResponseEntity.ok(cartaActualizada);
     }
 
     @PutMapping("/precios")
