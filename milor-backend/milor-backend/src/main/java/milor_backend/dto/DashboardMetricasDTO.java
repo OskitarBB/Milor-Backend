@@ -33,6 +33,7 @@ public class DashboardMetricasDTO {
         private String nombre;
         private int vendidos;
         private String stockRestante;
+        private Boolean activo;
     }
 
     @Data

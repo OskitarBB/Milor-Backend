@@ -114,10 +114,14 @@ public class VentaService {
 
             String stockStr = Boolean.TRUE.equals(plato.getEsIlimitado()) ? "Ilimitado" : String.valueOf(plato.getStock());
 
+            // ¡ESTA ES LA LÍNEA QUE FALTABA DECLARAR PARA EVITAR EL ERROR EN JAVA!
+            boolean esActivo = plato.getActivo() == null || plato.getActivo();
+
             conteoPorPlato.put(plato.getId(), DashboardMetricasDTO.DetallePlatoMetrica.builder()
                     .nombre(plato.getNombre())
                     .vendidos(vendidos)
                     .stockRestante(stockStr)
+                    .activo(esActivo) // Ahora sí reconocerá la variable
                     .build());
         }
 

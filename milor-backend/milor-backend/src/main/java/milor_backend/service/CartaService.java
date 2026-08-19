@@ -23,6 +23,8 @@ public class CartaService {
     private final EntradaRepository entradaRepository;
     private final ConfiguracionPrecioRepository configuracionPrecioRepository;
     private final DetalleVentaRepository detalleVentaRepository;
+    private final VentaService ventaService;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     @Transactional(readOnly = true)
     public CartaDiariaDTO obtenerCartaActual() {
@@ -51,6 +53,7 @@ public class CartaService {
         if (plato.getActivo() == null) {
             plato.setActivo(true);
         }
+        notificarCambiosMetricas();
         return platoRepository.save(plato);
     }
 
@@ -70,6 +73,7 @@ public class CartaService {
             // Borrado físico si nunca fue vendido
             platoRepository.deleteById(id);
         }
+        notificarCambiosMetricas();
     }
 
     @Transactional
@@ -77,6 +81,7 @@ public class CartaService {
         if (entrada.getActivo() == null) {
             entrada.setActivo(true);
         }
+        notificarCambiosMetricas();
         return entradaRepository.save(entrada);
     }
 
@@ -95,10 +100,20 @@ public class CartaService {
             // Borrado físico si nunca fue vendida
             entradaRepository.deleteById(id);
         }
+        notificarCambiosMetricas();
     }
 
     @Transactional
     public ConfiguracionPrecio actualizarPrecios(ConfiguracionPrecio nuevosPrecios) {
+        notificarCambiosMetricas();
         return configuracionPrecioRepository.save(nuevosPrecios);
+    }
+
+    private void notificarCambiosMetricas() {
+        try {
+            messagingTemplate.convertAndSend("/topic/metricas", ventaService.obtenerMetricas());
+        } catch (Exception e) {
+            System.err.println("Error al emitir métricas por WebSocket: " + e.getMessage());
+        }
     }
 }
