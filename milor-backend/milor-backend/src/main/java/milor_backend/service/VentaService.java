@@ -6,16 +6,14 @@ import milor_backend.dto.ItemVentaRequest;
 import milor_backend.dto.RegistroVentaRequest;
 import milor_backend.entity.*;
 import milor_backend.repository.*;
+import org.springframework.context.ApplicationEventPublisher; // <-- IMPORTAR
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +25,11 @@ public class VentaService {
     private final PlatoRepository platoRepository;
     private final EntradaRepository entradaRepository;
     private final TurnoRepository turnoRepository;
+
+    private final SimpMessagingTemplate messagingTemplate;
+
+    // Publicador de eventos de Spring (Rompe cualquier ciclo de beans)
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public VentaRegistro registrarVenta(RegistroVentaRequest request) {
@@ -74,7 +77,23 @@ public class VentaService {
         }
 
         ventaGuardada.setTotal(total);
-        return ventaRegistroRepository.save(ventaGuardada);
+        VentaRegistro resultadoFinal = ventaRegistroRepository.save(ventaGuardada);
+
+        // =========================================================================
+        // NOTIFICAR TIEMPO REAL VÍA WEBSOCKETS Y EVENTOS
+        // =========================================================================
+        try {
+            // 1. Enviar métricas actualizadas del turno en vivo al dashboard
+            messagingTemplate.convertAndSend("/topic/metricas", obtenerMetricas());
+
+            // 2. Publicar evento para que CartaService actualice el stock en la carta
+            eventPublisher.publishEvent(new VentaRegistradaEvent(this));
+
+        } catch (Exception e) {
+            System.err.println("Error al emitir WebSockets tras venta: " + e.getMessage());
+        }
+
+        return resultadoFinal;
     }
 
     @Transactional(readOnly = true)
@@ -103,7 +122,6 @@ public class VentaService {
         return construirMetricas(ventas, detalles, platos);
     }
 
-    // Nuevo servicio que filtra exclusivamente por las fechas recibidas
     @Transactional(readOnly = true)
     public DashboardMetricasDTO obtenerMetricasHistorico(LocalDateTime inicio, LocalDateTime fin) {
         List<VentaRegistro> ventas = ventaRegistroRepository.findByFechaHoraBetweenOrderByFechaHoraDesc(inicio, fin);
@@ -113,7 +131,6 @@ public class VentaService {
         return construirMetricas(ventas, detalles, platos);
     }
 
-    // Lógica matemática centralizada
     private DashboardMetricasDTO construirMetricas(List<VentaRegistro> ventas, List<DetalleVenta> detalles, List<Plato> platos) {
         BigDecimal totalRecaudado = ventas.stream()
                 .map(VentaRegistro::getTotal)
