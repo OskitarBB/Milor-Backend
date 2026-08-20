@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import milor_backend.entity.Usuario;
 import milor_backend.repository.UsuarioRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,21 +15,22 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Si no existe ningún usuario, creamos uno de Soporte y uno Admin por defecto
         if (usuarioRepository.count() == 0) {
+            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
             usuarioRepository.save(Usuario.builder()
                     .username("soporte")
-                    .password("12345")
+                    .password(encoder.encode("12345")) // Cifrado automático
                     .rol("SOPORTE")
                     .build());
 
             usuarioRepository.save(Usuario.builder()
                     .username("admin")
-                    .password("12345")
+                    .password(encoder.encode("12345")) // Cifrado automático
                     .rol("ADMIN")
                     .build());
 
-            System.out.println(">>> Usuarios por defecto (Soporte y Admin) creados exitosamente.");
+            System.out.println(">>> Usuarios por defecto (Soporte y Admin) creados con contraseñas encriptadas.");
         }
     }
 }
