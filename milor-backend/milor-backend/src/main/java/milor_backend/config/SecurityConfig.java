@@ -13,9 +13,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Desactivar CSRF para permitir peticiones POST desde Angular
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll() // Permitir acceso libre a todos los endpoints de la API y WebSockets
+                        .anyRequest().permitAll()
                 );
 
         return http.build();
