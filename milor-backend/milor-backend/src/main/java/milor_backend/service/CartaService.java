@@ -34,6 +34,13 @@ public class CartaService {
         List<Plato> platos = platoRepository.findAll();
         List<Entrada> entradas = entradaRepository.findAll();
 
+        // 🛡️ Blindaje defensivo: Aseguramos que ninguna entrada tenga el campo activo en null[cite: 11]
+        for (Entrada e : entradas) {
+            if (e.getActivo() == null) {
+                e.setActivo(true);
+            }
+        }
+
         ConfiguracionPrecio precio = configuracionPrecioRepository.findAll().stream()
                 .findFirst()
                 .orElseGet(() -> {
