@@ -83,10 +83,13 @@ public class VentaService {
         // NOTIFICAR TIEMPO REAL VÍA WEBSOCKETS Y EVENTOS
         // =========================================================================
         try {
-            // 1. Enviar métricas actualizadas del turno en vivo al dashboard
+            // 1. Enviar métricas actualizadas del turno en vivo al dashboard[cite: 7]
             messagingTemplate.convertAndSend("/topic/metricas", obtenerMetricas());
 
-            // 2. Publicar evento para que CartaService actualice el stock en la carta
+            // 🚀 1.1. ENVIAR LA NOTIFICACIÓN DE VENTA REGISTRADA AL TÓPICO /topic/ventas
+            messagingTemplate.convertAndSend("/topic/ventas", resultadoFinal);
+
+            // 2. Publicar evento para que CartaService actualice el stock en la carta[cite: 7]
             eventPublisher.publishEvent(new VentaRegistradaEvent(this));
 
         } catch (Exception e) {
