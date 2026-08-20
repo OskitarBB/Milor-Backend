@@ -2,6 +2,8 @@ package milor_backend.service;
 
 import lombok.RequiredArgsConstructor;
 import milor_backend.entity.Turno;
+import milor_backend.repository.PlatoRepository;
+import milor_backend.repository.EntradaRepository;
 import milor_backend.repository.TurnoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +16,11 @@ import java.util.Optional;
 public class TurnoService {
 
     private final TurnoRepository turnoRepository;
+    private final PlatoRepository platoRepository;
+    private final EntradaRepository entradaRepository;
 
     @Transactional
     public Turno abrirNuevoTurno() {
-        // Opcional: Cierra cualquier turno abierto previo por seguridad
         turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO").ifPresent(turno -> {
             turno.setEstado("CERRADO");
             turno.setFechaCierre(LocalDateTime.now());
@@ -44,6 +47,17 @@ public class TurnoService {
             turno.setEstado("CERRADO");
             turno.setFechaCierre(LocalDateTime.now());
             turnoRepository.save(turno);
+
+            // 🚀 Al cerrar turno, inactivamos visualmente todos los platos y entradas
+            // para que la carta aparezca vacía al iniciar el siguiente turno, protegiendo el historial.
+            platoRepository.findAll().forEach(p -> {
+                p.setActivo(false);
+                platoRepository.save(p);
+            });
+            entradaRepository.findAll().forEach(e -> {
+                e.setActivo(false);
+                entradaRepository.save(e);
+            });
         }
     }
 }
