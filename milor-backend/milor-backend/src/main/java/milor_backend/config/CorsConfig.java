@@ -16,8 +16,12 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // Declaramos los orígenes explícitamente sin usar asteriscos
-        config.setAllowedOrigins(List.of("http://localhost:4200", "http://127.0.0.1:4200"));
+        // Agregamos tu dominio de Netlify y los entornos locales
+        config.setAllowedOrigins(List.of(
+                "https://verdant-bonbon-7f6179.netlify.app",
+                "http://localhost:4200",
+                "http://127.0.0.1:4200"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
