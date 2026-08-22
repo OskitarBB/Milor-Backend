@@ -3,7 +3,6 @@ package milor_backend.service;
 import lombok.RequiredArgsConstructor;
 import milor_backend.entity.Usuario;
 import milor_backend.repository.UsuarioRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +13,6 @@ import java.util.List;
 public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
 
-    // Instancia del codificador de BCrypt
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
     @Transactional(readOnly = true)
     public List<Usuario> listarUsuarios() {
         return usuarioRepository.findAll();
@@ -24,10 +20,7 @@ public class UsuarioService {
 
     @Transactional
     public Usuario guardarUsuario(Usuario usuario) {
-        // Encriptar la contraseña antes de guardarla en la base de datos
-        String passwordCifrada = passwordEncoder.encode(usuario.getPassword());
-        usuario.setPassword(passwordCifrada);
-
+        // Guarda la contraseña en texto plano directamente
         return usuarioRepository.save(usuario);
     }
 
@@ -48,8 +41,8 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Verificar si la contraseña ingresada coincide con el hash cifrado de la BD
-        if (!passwordEncoder.matches(password, usuario.getPassword())) {
+        // Compara la contraseña en texto plano directamente
+        if (!password.equals(usuario.getPassword())) {
             throw new RuntimeException("Contraseña incorrecta");
         }
         return usuario;
