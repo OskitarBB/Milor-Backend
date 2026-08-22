@@ -3,7 +3,7 @@ package milor_backend.service;
 import lombok.RequiredArgsConstructor;
 import milor_backend.entity.Usuario;
 import milor_backend.repository.UsuarioRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // <-- Importamos BCrypt
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +24,9 @@ public class UsuarioService {
 
     @Transactional
     public Usuario guardarUsuario(Usuario usuario) {
+        // Convertimos el username a minúsculas y limpiamos espacios para mantener consistencia
+        usuario.setUsername(usuario.getUsername().toLowerCase().trim());
+
         // Encriptamos la contraseña antes de guardarla en la base de datos
         String passwordCifrada = passwordEncoder.encode(usuario.getPassword());
         usuario.setPassword(passwordCifrada);
@@ -44,7 +47,8 @@ public class UsuarioService {
 
     @Transactional(readOnly = true)
     public Usuario autenticar(String username, String password) {
-        Usuario usuario = usuarioRepository.findByUsername(username)
+        // Buscamos ignorando mayúsculas/minúsculas usando el repositorio
+        Usuario usuario = usuarioRepository.findByUsernameIgnoreCase(username.trim())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         // Comparamos la contraseña plana ingresada con el hash cifrado usando .matches()
