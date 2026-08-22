@@ -18,7 +18,7 @@ public class CorsConfig {
 
         // Agregamos tu dominio de Netlify y los entornos locales
         config.setAllowedOrigins(List.of(
-                "https://verdant-bonbon-7f6179.netlify.app",
+                "https://milor-pos.netlify.app/",
                 "http://localhost:4200",
                 "http://127.0.0.1:4200"
         ));
