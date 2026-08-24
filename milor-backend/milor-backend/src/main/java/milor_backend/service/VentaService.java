@@ -6,13 +6,14 @@ import milor_backend.dto.ItemVentaRequest;
 import milor_backend.dto.RegistroVentaRequest;
 import milor_backend.entity.*;
 import milor_backend.repository.*;
-import org.springframework.context.ApplicationEventPublisher; // <-- IMPORTAR
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId; // <--- 1. IMPORTAR ZONEID
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,7 +41,7 @@ public class VentaService {
 
         VentaRegistro venta = VentaRegistro.builder()
                 .modalidad(request.getModalidad())
-                .fechaHora(LocalDateTime.now())
+                .fechaHora(LocalDateTime.now(ZoneId.of("America/Lima"))) // <--- 2. FORZAR ZONA HORARIA DE PERÚ AQUÍ
                 .total(BigDecimal.ZERO)
                 .turno(turnoActual)
                 .build();
@@ -83,13 +84,13 @@ public class VentaService {
         // NOTIFICAR TIEMPO REAL VÍA WEBSOCKETS Y EVENTOS
         // =========================================================================
         try {
-            // 1. Enviar métricas actualizadas del turno en vivo al dashboard[cite: 7]
+            // 1. Enviar métricas actualizadas del turno en vivo al dashboard
             messagingTemplate.convertAndSend("/topic/metricas", obtenerMetricas());
 
             // 🚀 1.1. ENVIAR LA NOTIFICACIÓN DE VENTA REGISTRADA AL TÓPICO /topic/ventas
             messagingTemplate.convertAndSend("/topic/ventas", resultadoFinal);
 
-            // 2. Publicar evento para que CartaService actualice el stock en la carta[cite: 7]
+            // 2. Publicar evento para que CartaService actualice el stock en la carta
             eventPublisher.publishEvent(new VentaRegistradaEvent(this));
 
         } catch (Exception e) {
@@ -101,7 +102,8 @@ public class VentaService {
 
     @Transactional(readOnly = true)
     public DashboardMetricasDTO obtenerMetricas() {
-        Optional<Turno> turnoActivoOpt = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO");        if (turnoActivoOpt.isEmpty()) {
+        Optional<Turno> turnoActivoOpt = turnoRepository.findTopByEstadoOrderByIdDesc("ABIERTO");
+        if (turnoActivoOpt.isEmpty()) {
             return DashboardMetricasDTO.builder()
                     .totalRecaudado(BigDecimal.ZERO)
                     .totalMenusVendidos(0)
