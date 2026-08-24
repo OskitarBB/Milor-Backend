@@ -19,10 +19,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> {}) // Habilita CORS en Spring Security
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/usuarios/login", "/ws/**").permitAll()
+                        .requestMatchers(
+                                "/api/usuarios/login",
+                                "/ws/**",
+                                "/api/carta/**",
+                                "/api/ventas/**",
+                                "/api/turnos/**"
+                        ).permitAll() // Permite acceso directo al núcleo del POS para agilizar la operación local
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

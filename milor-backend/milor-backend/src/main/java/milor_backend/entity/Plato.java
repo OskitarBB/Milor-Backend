@@ -1,30 +1,31 @@
 package milor_backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
 @Table(name = "platos")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // <--- IGNORA LOS PROXIES DE HIBERNATE
 public class Plato {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, unique = true)
     private String nombre;
 
-    @Column(nullable = false)
-    private Integer stock;
+    @Builder.Default
+    private Integer stock = 0;
 
-    @Column(name = "es_ilimitado", nullable = false)
-    private Boolean esIlimitado;
+    @Builder.Default
+    private Boolean esIlimitado = false;
 
-    @Column(nullable = false)
-    private Boolean activo;
+    @Builder.Default
+    private Boolean activo = true;
 }
