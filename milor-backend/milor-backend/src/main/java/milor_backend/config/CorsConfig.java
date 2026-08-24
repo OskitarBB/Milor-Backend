@@ -16,12 +16,8 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // Agregamos tu dominio de Netlify y los entornos locales
-        config.setAllowedOrigins(List.of(
-                "https://milor-pos.netlify.app/",
-                "http://localhost:4200",
-                "http://127.0.0.1:4200"
-        ));
+        // Declaramos los orígenes explícitamente sin usar asteriscos
+        config.setAllowedOrigins(List.of("http://localhost:4200", "http://127.0.0.1:4200"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
