@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneId; // <--- 1. IMPORTAR ZONEID
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,7 +41,7 @@ public class VentaService {
 
         VentaRegistro venta = VentaRegistro.builder()
                 .modalidad(request.getModalidad())
-                .fechaHora(LocalDateTime.now(ZoneId.of("America/Lima"))) // <--- 2. FORZAR ZONA HORARIA DE PERÚ AQUÍ
+                .fechaHora(LocalDateTime.now(ZoneId.of("America/Lima")))
                 .total(BigDecimal.ZERO)
                 .turno(turnoActual)
                 .build();
@@ -139,12 +139,13 @@ public class VentaService {
                 .map(VentaRegistro::getTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        int totalLocal = (int) ventas.stream()
-                .filter(v -> "LOCAL".equalsIgnoreCase(String.valueOf(v.getModalidad())))
+        // MODIFICADO: Contamos los platos individuales (detalles) según la modalidad de su venta correspondiente
+        int totalLocal = (int) detalles.stream()
+                .filter(d -> d.getVenta() != null && "LOCAL".equalsIgnoreCase(String.valueOf(d.getVenta().getModalidad())))
                 .count();
 
-        int totalLlevar = (int) ventas.stream()
-                .filter(v -> "LLEVAR".equalsIgnoreCase(String.valueOf(v.getModalidad())))
+        int totalLlevar = (int) detalles.stream()
+                .filter(d -> d.getVenta() != null && "LLEVAR".equalsIgnoreCase(String.valueOf(d.getVenta().getModalidad())))
                 .count();
 
         int totalConEntrada = (int) detalles.stream()
@@ -186,11 +187,19 @@ public class VentaService {
                 .limit(10)
                 .map(v -> {
                     List<DetalleVenta> itemsVenta = detallesPorVenta.getOrDefault(v.getId(), new ArrayList<>());
-                    List<String> descripciones = itemsVenta.stream()
-                            .map(d -> {
+
+                    Map<String, Long> conteoAgrupado = itemsVenta.stream()
+                            .collect(Collectors.groupingBy(d -> {
                                 String nomPlato = d.getPlato() != null ? d.getPlato().getNombre() : "Plato";
                                 String nomEntrada = d.getEntrada() != null ? " (" + d.getEntrada().getNombre() + ")" : "";
                                 return nomPlato + nomEntrada;
+                            }, Collectors.counting()));
+
+                    List<String> descripciones = conteoAgrupado.entrySet().stream()
+                            .map(entry -> {
+                                long cantidad = entry.getValue();
+                                String textoItem = entry.getKey();
+                                return cantidad > 1 ? cantidad + "x " + textoItem : textoItem;
                             })
                             .collect(Collectors.toList());
 
