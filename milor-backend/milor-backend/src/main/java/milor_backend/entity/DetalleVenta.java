@@ -1,14 +1,12 @@
 package milor_backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "detalles_venta")
-@Getter
-@Setter
+@Table(name = "detalle_venta")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -20,21 +18,20 @@ public class DetalleVenta {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "venta_id", nullable = false)
-    @JsonIgnore
     private VentaRegistro venta;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plato_id", nullable = false)
     private Plato plato;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entrada_id")
-    private Entrada entrada; // Puede ser null si es "Sin Entrada"
+    private Entrada entrada;
+
+    private String tipo; // COMPLETO o SOLO_SEGUNDO
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_menu", nullable = false, length = 20)
-    private TipoMenu tipo;
+    private ModalidadConsumo modalidad; // <--- Modalidad independiente por ítem
 
-    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 }

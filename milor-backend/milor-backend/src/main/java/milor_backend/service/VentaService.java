@@ -28,8 +28,6 @@ public class VentaService {
     private final TurnoRepository turnoRepository;
 
     private final SimpMessagingTemplate messagingTemplate;
-
-    // Publicador de eventos de Spring (Rompe cualquier ciclo de beans)
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -70,6 +68,7 @@ public class VentaService {
                     .plato(plato)
                     .entrada(entrada)
                     .tipo(item.getTipo())
+                    .modalidad(item.getModalidad() != null ? item.getModalidad() : request.getModalidad())
                     .subtotal(item.getSubtotal())
                     .build();
 
@@ -80,19 +79,10 @@ public class VentaService {
         ventaGuardada.setTotal(total);
         VentaRegistro resultadoFinal = ventaRegistroRepository.save(ventaGuardada);
 
-        // =========================================================================
-        // NOTIFICAR TIEMPO REAL VÍA WEBSOCKETS Y EVENTOS
-        // =========================================================================
         try {
-            // 1. Enviar métricas actualizadas del turno en vivo al dashboard
             messagingTemplate.convertAndSend("/topic/metricas", obtenerMetricas());
-
-            // 🚀 1.1. ENVIAR LA NOTIFICACIÓN DE VENTA REGISTRADA AL TÓPICO /topic/ventas
             messagingTemplate.convertAndSend("/topic/ventas", resultadoFinal);
-
-            // 2. Publicar evento para que CartaService actualice el stock en la carta
             eventPublisher.publishEvent(new VentaRegistradaEvent(this));
-
         } catch (Exception e) {
             System.err.println("Error al emitir WebSockets tras venta: " + e.getMessage());
         }
@@ -117,7 +107,6 @@ public class VentaService {
         }
 
         Turno turnoActual = turnoActivoOpt.get();
-
         List<VentaRegistro> ventas = ventaRegistroRepository.findByTurno(turnoActual);
         List<DetalleVenta> detalles = detalleVentaRepository.findByVentaTurno(turnoActual);
         List<Plato> platos = platoRepository.findAll();
@@ -139,13 +128,12 @@ public class VentaService {
                 .map(VentaRegistro::getTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // MODIFICADO: Contamos los platos individuales (detalles) según la modalidad de su venta correspondiente
         int totalLocal = (int) detalles.stream()
-                .filter(d -> d.getVenta() != null && "LOCAL".equalsIgnoreCase(String.valueOf(d.getVenta().getModalidad())))
+                .filter(d -> "LOCAL".equalsIgnoreCase(String.valueOf(d.getModalidad())))
                 .count();
 
         int totalLlevar = (int) detalles.stream()
-                .filter(d -> d.getVenta() != null && "LLEVAR".equalsIgnoreCase(String.valueOf(d.getVenta().getModalidad())))
+                .filter(d -> "LLEVAR".equalsIgnoreCase(String.valueOf(d.getModalidad())))
                 .count();
 
         int totalConEntrada = (int) detalles.stream()
@@ -160,22 +148,21 @@ public class VentaService {
 
         Map<Long, DashboardMetricasDTO.DetallePlatoMetrica> conteoPorPlato = new HashMap<>();
 
+        // 🚀 Se incluyen todos los platos para que nunca desaparezcan del dashboard, sin importar su estado activo/inactivo
         for (Plato plato : platos) {
             int vendidos = (int) detalles.stream()
                     .filter(d -> d.getPlato() != null && d.getPlato().getId().equals(plato.getId()))
                     .count();
 
-            if (vendidos > 0 || (plato.getActivo() != null && plato.getActivo())) {
-                String stockStr = Boolean.TRUE.equals(plato.getEsIlimitado()) ? "Ilimitado" : String.valueOf(plato.getStock());
-                boolean esActivo = plato.getActivo() == null || plato.getActivo();
+            String stockStr = Boolean.TRUE.equals(plato.getEsIlimitado()) ? "Ilimitado" : String.valueOf(plato.getStock());
+            boolean esActivo = plato.getActivo() == null || plato.getActivo();
 
-                conteoPorPlato.put(plato.getId(), DashboardMetricasDTO.DetallePlatoMetrica.builder()
-                        .nombre(plato.getNombre())
-                        .vendidos(vendidos)
-                        .stockRestante(stockStr)
-                        .activo(esActivo)
-                        .build());
-            }
+            conteoPorPlato.put(plato.getId(), DashboardMetricasDTO.DetallePlatoMetrica.builder()
+                    .nombre(plato.getNombre())
+                    .vendidos(vendidos)
+                    .stockRestante(stockStr)
+                    .activo(esActivo)
+                    .build());
         }
 
         Map<Long, List<DetalleVenta>> detallesPorVenta = detalles.stream()
@@ -188,27 +175,36 @@ public class VentaService {
                 .map(v -> {
                     List<DetalleVenta> itemsVenta = detallesPorVenta.getOrDefault(v.getId(), new ArrayList<>());
 
-                    Map<String, Long> conteoAgrupado = itemsVenta.stream()
+                    Map<String, List<DetalleVenta>> grupo = itemsVenta.stream()
                             .collect(Collectors.groupingBy(d -> {
                                 String nomPlato = d.getPlato() != null ? d.getPlato().getNombre() : "Plato";
-                                String nomEntrada = d.getEntrada() != null ? " (" + d.getEntrada().getNombre() + ")" : "";
-                                return nomPlato + nomEntrada;
-                            }, Collectors.counting()));
+                                String idEntrada = d.getEntrada() != null ? String.valueOf(d.getEntrada().getId()) : "0";
+                                String mod = d.getModalidad() != null ? d.getModalidad().name() : "LOCAL";
+                                return nomPlato + "|" + idEntrada + "|" + mod;
+                            }));
 
-                    List<String> descripciones = conteoAgrupado.entrySet().stream()
-                            .map(entry -> {
-                                long cantidad = entry.getValue();
-                                String textoItem = entry.getKey();
-                                return cantidad > 1 ? cantidad + "x " + textoItem : textoItem;
-                            })
-                            .collect(Collectors.toList());
+                    List<DashboardMetricasDTO.ItemOrdenDTO> listaItems = new ArrayList<>();
+                    for (List<DetalleVenta> listaDetalles : grupo.values()) {
+                        DetalleVenta primero = listaDetalles.get(0);
+                        String nomPlato = primero.getPlato() != null ? primero.getPlato().getNombre() : "Plato";
+                        String nomEntrada = primero.getEntrada() != null ? primero.getEntrada().getNombre() : null;
+                        ModalidadConsumo mod = primero.getModalidad();
+                        long cantidad = listaDetalles.size();
+
+                        listaItems.add(DashboardMetricasDTO.ItemOrdenDTO.builder()
+                                .platoNombre(nomPlato)
+                                .entradaNombre(nomEntrada)
+                                .modalidad(mod)
+                                .cantidad(cantidad)
+                                .build());
+                    }
 
                     return DashboardMetricasDTO.OrdenRecienteDTO.builder()
                             .id(v.getId())
                             .fechaHora(v.getFechaHora())
                             .modalidad(v.getModalidad())
                             .total(v.getTotal())
-                            .descripcionItems(descripciones)
+                            .items(listaItems)
                             .build();
                 })
                 .collect(Collectors.toList());

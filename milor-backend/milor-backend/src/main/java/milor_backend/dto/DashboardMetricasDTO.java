@@ -33,7 +33,18 @@ public class DashboardMetricasDTO {
         private String nombre;
         private int vendidos;
         private String stockRestante;
-        private Boolean activo;
+        private boolean activo;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ItemOrdenDTO {
+        private String platoNombre;
+        private String entradaNombre;
+        private ModalidadConsumo modalidad;
+        private long cantidad;
     }
 
     @Data
@@ -45,6 +56,6 @@ public class DashboardMetricasDTO {
         private LocalDateTime fechaHora;
         private ModalidadConsumo modalidad;
         private BigDecimal total;
-        private List<String> descripcionItems;
+        private List<ItemOrdenDTO> items;
     }
 }

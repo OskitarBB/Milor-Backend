@@ -1,25 +1,14 @@
 package milor_backend.dto;
 
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
-import milor_backend.entity.TipoMenu;
+import lombok.Data;
+import milor_backend.entity.ModalidadConsumo;
 import java.math.BigDecimal;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Data
 public class ItemVentaRequest {
-
-    @NotNull(message = "El ID del plato es obligatorio")
     private Long platoId;
-
-    private Long entradaId; // Opcional (null = sin entrada)
-
-    @NotNull(message = "El tipo de menú es obligatorio")
-    private TipoMenu tipo;
-
-    @NotNull(message = "El subtotal es obligatorio")
+    private Long entradaId;
+    private String tipo;
+    private ModalidadConsumo modalidad; // <--- Recibe la modalidad independiente de este ítem
     private BigDecimal subtotal;
 }
