@@ -19,13 +19,13 @@ public class DataInitializer implements CommandLineRunner {
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
             usuarioRepository.save(Usuario.builder()
-                    .username("soporte")
+                    .username("Oscar")
                     .password(encoder.encode("12345")) // Cifrado automático
                     .rol("SOPORTE")
                     .build());
 
             usuarioRepository.save(Usuario.builder()
-                    .username("admin")
+                    .username("Nilo")
                     .password(encoder.encode("12345")) // Cifrado automático
                     .rol("ADMIN")
                     .build());
